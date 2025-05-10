@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Tomato & Pie Splat with Sound & Background Upload/Crop</title>
+<style>
+  /* Reset and base */
+  * {
+    box-sizing: border-box;
+  }
+  body, html {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    background: #333;
+  }
+
+  #app {
+    position: relative;
+    width: 350px;
+    height: 600px;
+    margin: 0 auto;
+    overflow: hidden;
+    user-select: none;
+    touch-action: manipulation;
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+    border: 3px solid #222;
+    border-radius: 10px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+    background-color: white;
+  }
+
+  /* Control container */
+  #control {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 1000;
+    background: rgba(255 255 255 / 0.85);
+    padding: 12px 16px;
+    border-radius: 12px;
+    box-shadow: 0 0 12px rgba(0,0,0,0.25);
+    user-select: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    max-width: 320px;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+  }
+  #control.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  #control label {
+    font-weight: 600;
+    font-size: 14px;
+    color: #222;
+  }
+  #bgSelect {
+    font-size: 14px;
+    border-radius: 6px;
+    border: 1.5px solid #ccc;
+    padding: 5px 10px;
+    cursor: pointer;
+    transition: border-color 0.2s ease;
+    background: white;
+  }
+  #bgSelect:focus {
+    border-color: #e63946;
+    outline: none;
+  }
+  #uploadLabel {
+    font-size: 14px;
+    background: #e63946;
+    color: white;
+    border-radius: 8px;
+    padding: 6px 14px;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.3s ease;
+    border: none;
+  }
+  #uploadLabel:hover, #uploadLabel:focus {
+    background-color: #d62828;
+    outline: none;
+  }
+  #fileInput {
+    display: none;
+  }
+
+  /* Toggle control button */
+  #toggleControlBtn {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: #e63946;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    user-select: none;
+    transition: background-color 0.3s ease;
+    z-index: 1100;
+  }
+  #toggleControlBtn:hover, #toggleControlBtn:focus {
+    background-color: #d62828;
+    outline: none;
+  }
+  /* Hide toggle button when control is visible */
+  #toggleControlBtn.hidden {
+    display: none;
+  }
+
+  /* Click count display */
+  #clickCount {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    background: rgba(255 255 255 / 0.85);
+    padding: 6px 12px;
+    border-radius: 12px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.25);
+    font-weight: 700;
+    font-size: 16px;
+    color: #222;
+    user-select: none;
+    z-index: 1000;
+  }
+
+  /* Splat container */
+  .splat {
+    position: absolute;
+    pointer-events: none;
+    transform-origin: center center;
+    animation: splatAnimation 0.6s forwards;
+  }
+  @keyframes splatAnimation {
+    0%   {opacity: 1; transform: scale(0.4) rotate(0deg);}
+    70%  {opacity: 1; transform: scale(1.3) rotate(35deg);}
+    100% {opacity: 0; transform: scale(1.5) rotate(45deg);}
+  }
+  .splat img {
+    width: 64px;
+    height: 64px;
+    user-select: none;
+    pointer-events: none;
+    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.3));
+  }
+
+  /* Responsive fallback */
+  @media (max-width: 400px) {
+    #app {
+      width: 100vw;
+      height: calc(100vw / 350 * 600);
+      max-height: 600px;
+      border-radius: 0;
+      border: none;
+      box-shadow: none;
+    }
+    #control {
+      max-width: 90vw;
+      left: 5vw;
+      top: 8px;
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+    #uploadLabel {
+      font-size: 13px;
+      padding: 5px 10px;
+    }
+    #clickCount {
+      font-size: 14px;
+      padding: 4px 10px;
+      bottom: 8px;
+      left: 8px;
+    }
+    #toggleControlBtn {
+      top: 8px;
+      left: 8px;
+      font-size: 13px;
+      padding: 5px 10px;
+    }
+  }
+
+  /* Crop modal styles */
+  #cropModal {
+    display: none;
+    position: fixed;
+    z-index: 2000;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(5px);
+    user-select: none;
+    touch-action: none;
+    align-items: center;
+    justify-content: center;
+  }
+  #cropContent {
+    position: relative;
+    background: #222;
+    border-radius: 12px;
+    max-width: 90vw;
+    max-height: 90vh;
+    padding: 12px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  #cropCanvas {
+    background: #444;
+    border-radius: 8px;
+    max-width: 100%;
+    max-height: 70vh;
+    touch-action: none;
+    user-drag: none;
+  }
+  #cropInstructions {
+    margin: 8px 0 12px;
+    color: #eee;
+    font-size: 14px;
+    max-width: 320px;
+    text-align: center;
+  }
+  #cropActions {
+    display: flex;
+    gap: 16px;
+  }
+  #cropActions button {
+    background: #e63946;
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-weight: 600;
+    padding: 8px 20px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    user-select: none;
+  }
+  #cropActions button:hover, #cropActions button:focus {
+    background-color: #d62828;
+    outline: none;
+  }
+</style>
+</head>
+<body>
+  <div id="app" tabindex="0" aria-label="Tomato and Pie throwing game. Click anywhere to splat. Change background with presets or upload on top left.">
+    <button id="toggleControlBtn" aria-pressed="true" aria-label="Toggle background controls">Hide Controls</button>
+    <div id="control" role="region" aria-label="Background selection and upload control">
+      <label for="bgSelect">Background:</label>
+      <select id="bgSelect" aria-controls="app">
+        <option value="white">White</option>
+        <option value="#d0f0fd">Sky Blue</option>
+        <option value="#fce6e6">Soft Pink</option>
+        <option value="#d6f5d6">Light Green</option>
+        <option value="#fff4cc">Light Yellow</option>
+        <option value="url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&amp;fit=crop&amp;w=350&amp;q=80')">Beach</option>
+        <option value="url('https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&amp;fit=crop&amp;w=350&amp;q=80')">Meadow</option>
+        <option value="url('https://images.unsplash.com/photo-1425321395722-b1dd54a97cf3?auto=format&amp;fit=crop&amp;w=350&amp;q=80')">Wood</option>
+      </select>
+      <label id="uploadLabel" for="fileInput" tabindex="0" role="button" aria-label="Upload background image">Upload Image</label>
+      <input type="file" accept="image/*" id="fileInput" aria-hidden="true" />
+    </div>
+    <div id="clickCount" aria-live="polite" aria-atomic="true">Clicks: 0</div>
+  </div>
+
+  <!-- Crop modal -->
+  <div id="cropModal" role="dialog" aria-modal="true" aria-labelledby="cropTitle" aria-describedby="cropInstructions">
+    <div id="cropContent">
+      <h2 id="cropTitle" style="color:#eee;margin:0 0 8px 0; font-weight:700; font-size:18px;">Crop Background Image</h2>
+      <canvas id="cropCanvas" width="350" height="500" aria-label="Image cropping area"></canvas>
+      <div id="cropInstructions">Drag image to position. Use mouse wheel or pinch to zoom. Confirm crop or cancel.</div>
+      <div id="cropActions">
+        <button id="cropConfirmBtn">Confirm</button>
+        <button id="cropCancelBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Splat sound -->
+  <audio id="splatSound" preload="auto" src="https://files.catbox.moe/hwtcw9.mp3"></audio>
+
+<script>
+  (function(){
+    const app = document.getElementById('app');
+    const bgSelect = document.getElementById('bgSelect');
+    const splatSound = document.getElementById('splatSound');
+    const fileInput = document.getElementById('fileInput');
+    const uploadLabel = document.getElementById('uploadLabel');
+    const controlPanel = document.getElementById('control');
+    const toggleControlBtn = document.getElementById('toggleControlBtn');
+    const clickCountDisplay = document.getElementById('clickCount');
+
+    // Splat images
+    const splatImages = [
+      "https://openclipart.org/image/2000px/336192",
+      "https://www.pngfind.com/pngs/b/97-974249_splat-png.png"
+    ];
+
+    // Background presets values for easy resetting when user cancels
+    const initialBg = {bgColor: 'white', bgImage: ''};
+    let currentBg = {...initialBg};
+
+    // Click count
+    let clickCount = 0;
+
+    // Crop modal elements
+    const cropModal = document.getElementById('cropModal');
+    const cropCanvas = document.getElementById('cropCanvas');
+    const cropCtx = cropCanvas.getContext('2d');
+    const cropConfirmBtn = document.getElementById('cropConfirmBtn');
+    const cropCancelBtn = document.getElementById('cropCancelBtn');
+
+    let img = new Image();
+    let imgScale = 1;
+    let imgPos = {x: 0, y: 0};
+    let dragging = false;
+    let dragStart = {x: 0, y: 0};
+    let imgStartPos = {x: 0, y: 0};
+    let lastTouchDistance = 0;
+
+    // Update click count display
+    function updateClickCount(){
+      clickCountDisplay.textContent = 'Clicks: ' + clickCount;
+    }
+
+    // Handle background change from select
+    bgSelect.addEventListener('change', e => {
+      const val = e.target.value;
+      if(val.startsWith('url(')){
+        app.style.backgroundImage = val;
+        app.style.backgroundColor = 'transparent';
+        currentBg = {bgColor:'transparent', bgImage: val};
+      } else {
+        app.style.backgroundImage = '';
+        app.style.backgroundColor = val;
+        currentBg = {bgColor: val, bgImage: ''};
+      }
+    });
+
+    // Initialize with white background and click count
+    app.style.backgroundColor = initialBg.bgColor;
+    app.style.backgroundImage = initialBg.bgImage;
+    updateClickCount();
+
+    // Create and animate splat with sound
+    function createSplat(x, y) {
+      const splat = document.createElement('div');
+      splat.className = 'splat';
+      const imgEl = document.createElement('img');
+      imgEl.src = splatImages[Math.floor(Math.random() * splatImages.length)];
+      imgEl.alt = 'Splat item';
+      splat.appendChild(imgEl);
+      app.appendChild(splat);
+
+      const rect = app.getBoundingClientRect();
+      const offsetX = x - rect.left - 32;
+      const offsetY = y - rect.top - 32;
+      splat.style.left = offsetX + 'px';
+      splat.style.top = offsetY + 'px';
+
+      try {
+        let soundClone = splatSound.cloneNode();
+        soundClone.volume = 0.7;
+        soundClone.play();
+      } catch(e){ /* ignore play errors */ }
+
+      splat.addEventListener('animationend', () => {
+        if (splat.parentElement) splat.parentElement.removeChild(splat);
+      });
+    }
+
+    // Throw on click/touch
+    function onThrow(event) {
+      let x,y;
+      if(event.touches && event.touches.length > 0) {
+        x = event.touches[0].clientX;
+        y = event.touches[0].clientY;
+      } else {
+        x = event.clientX;
+        y = event.clientY;
+      }
+      createSplat(x, y);
+      clickCount++;
+      updateClickCount();
+    }
+
+    app.addEventListener('click', onThrow);
+    app.addEventListener('touchstart', onThrow);
+
+    // Toggle control panel visibility
+    toggleControlBtn.addEventListener('click', () => {
+      if(controlPanel.classList.contains('hidden')){
+        controlPanel.classList.remove('hidden');
+        toggleControlBtn.textContent = 'Hide Controls';
+        toggleControlBtn.setAttribute('aria-pressed', 'true');
+        // Move toggle button above control panel
+        toggleControlBtn.style.left = '12px';
+        toggleControlBtn.style.top = '12px';
+      } else {
+        controlPanel.classList.add('hidden');
+        toggleControlBtn.textContent = 'Show Controls';
+        toggleControlBtn.setAttribute('aria-pressed', 'false');
+        // Move toggle button to top left corner for easy access when controls hidden
+        toggleControlBtn.style.left = '12px';
+        toggleControlBtn.style.top = '12px';
+      }
+    });
+
+    // Open file selector on label click or keyboard enter/space key
+    uploadLabel.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        fileInput.click();
+      }
+    });
+
+    // Load image from user file input
+    fileInput.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if(file && file.type.startsWith('image/')){
+        const url = URL.createObjectURL(file);
+        img.src = url;
+      }
+      e.target.value = '';
+    });
+
+    // When image loaded, open crop modal and initialize
+    img.onload = () => {
+      openCropModal();
+    };
+
+    function openCropModal(){
+      cropModal.style.display = 'flex';
+      imgScale = 1;
+      imgPos = {x: 0, y: 0};
+
+      const appRect = app.getBoundingClientRect();
+      cropCanvas.width = appRect.width;
+      cropCanvas.height = appRect.height;
+      cropCanvas.style.width = appRect.width + 'px';
+      cropCanvas.style.height = appRect.height + 'px';
+
+      drawCropCanvas();
+    }
+
+    function drawCropCanvas(){
+      const cw = cropCanvas.width;
+      const ch = cropCanvas.height;
+      cropCtx.clearRect(0, 0, cw, ch);
+      cropCtx.fillStyle = '#222';
+      cropCtx.fillRect(0,0,cw,ch);
+
+      const iw = img.width * imgScale;
+      const ih = img.height * imgScale;
+
+      const minX = Math.min(0, cw - iw);
+      const minY = Math.min(0, ch - ih);
+      if(imgPos.x > 0) imgPos.x = 0;
+      if(imgPos.y > 0) imgPos.y = 0;
+      if(imgPos.x < minX) imgPos.x = minX;
+      if(imgPos.y < minY) imgPos.y = minY;
+
+      cropCtx.drawImage(img, imgPos.x, imgPos.y, iw, ih);
+
+      cropCtx.strokeStyle = '#e63946';
+      cropCtx.lineWidth = 4;
+      cropCtx.strokeRect(0, 0, cw, ch);
+    }
+
+    cropCanvas.addEventListener('mousedown', e => {
+      e.preventDefault();
+      dragging = true;
+      dragStart.x = e.clientX;
+      dragStart.y = e.clientY;
+      imgStartPos.x = imgPos.x;
+      imgStartPos.y = imgPos.y;
+    });
+
+    cropCanvas.addEventListener('mouseup', e => {
+      e.preventDefault();
+      dragging = false;
+    });
+    cropCanvas.addEventListener('mouseleave', e => {
+      dragging = false;
+    });
+
+    cropCanvas.addEventListener('mousemove', e => {
+      if(!dragging) return;
+      e.preventDefault();
+      const dx = e.clientX - dragStart.x;
+      const dy = e.clientY - dragStart.y;
+      imgPos.x = imgStartPos.x + dx;
+      imgPos.y = imgStartPos.y + dy;
+      drawCropCanvas();
+    });
+
+    cropCanvas.addEventListener('touchstart', e => {
+      if(e.touches.length === 1){
+        dragging = true;
+        dragStart.x = e.touches[0].clientX;
+        dragStart.y = e.touches[0].clientY;
+        imgStartPos.x = imgPos.x;
+        imgStartPos.y = imgPos.y;
+      } else if(e.touches.length === 2){
+        dragging = false;
+        lastTouchDistance = getTouchDistance(e.touches);
+      }
+    }, {passive: false});
+
+    cropCanvas.addEventListener('touchmove', e => {
+      e.preventDefault();
+      if(e.touches.length === 1 && dragging){
+        const dx = e.touches[0].clientX - dragStart.x;
+        const dy = e.touches[0].clientY - dragStart.y;
+        imgPos.x = imgStartPos.x + dx;
+        imgPos.y = imgStartPos.y + dy;
+        drawCropCanvas();
+      } else if(e.touches.length === 2){
+        const currentDistance = getTouchDistance(e.touches);
+        const scaleChange = currentDistance / lastTouchDistance;
+        imgScale *= scaleChange;
+        if(imgScale < 0.2) imgScale = 0.2;
+        if(imgScale > 5) imgScale = 5;
+        lastTouchDistance = currentDistance;
+        drawCropCanvas();
+      }
+    }, {passive:false});
+
+    cropCanvas.addEventListener('touchend', e => {
+      if(e.touches.length < 2){
+        dragging = false;
+        lastTouchDistance = 0;
+      }
+    });
+
+    cropCanvas.addEventListener('wheel', e => {
+      e.preventDefault();
+      const delta = e.deltaY || e.detail || e.wheelDelta;
+      const zoomFactor = -delta * 0.0015;
+      const newScale = imgScale * (1 + zoomFactor);
+      if(newScale < 0.2) return;
+      if(newScale > 5) return;
+      imgScale = newScale;
+      drawCropCanvas();
+    });
+
+    function getTouchDistance(touches) {
+      const dx = touches[0].clientX - touches[1].clientX;
+      const dy = touches[0].clientY - touches[1].clientY;
+      return Math.sqrt(dx*dx + dy*dy);
+    }
+
+    cropConfirmBtn.addEventListener('click', () => {
+      const cw = cropCanvas.width;
+      const ch = cropCanvas.height;
+      const outputCanvas = document.createElement('canvas');
+      outputCanvas.width = cw;
+      outputCanvas.height = ch;
+      const outCtx = outputCanvas.getContext('2d');
+      outCtx.fillStyle = currentBg.bgColor || 'white';
+      outCtx.fillRect(0, 0, cw, ch);
+      let sourceX = -imgPos.x / imgScale;
+      let sourceY = -imgPos.y / imgScale;
+      let sourceWidth = cw / imgScale;
+      let sourceHeight = ch / imgScale;
+      if(sourceX < 0) sourceX = 0;
+      if(sourceY < 0) sourceY = 0;
+      if(sourceX + sourceWidth > img.width) sourceWidth = img.width - sourceX;
+      if(sourceY + sourceHeight > img.height) sourceHeight = img.height - sourceY;
+      outCtx.drawImage(img, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, cw, ch);
+      const dataUrl = outputCanvas.toDataURL('image/jpeg', 0.9);
+      app.style.backgroundImage = `url("${dataUrl}")`;
+      app.style.backgroundColor = 'transparent';
+      currentBg = {bgColor:'transparent', bgImage: `url("${dataUrl}")`};
+      cropModal.style.display = 'none';
+      if(img.src.startsWith('blob:')) {
+        URL.revokeObjectURL(img.src);
+      }
+    });
+
+    cropCancelBtn.addEventListener('click', () => {
+      cropModal.style.display = 'none';
+      if(currentBg.bgImage){
+        app.style.backgroundImage = currentBg.bgImage;
+        app.style.backgroundColor = currentBg.bgColor || 'transparent';
+      } else {
+        app.style.backgroundImage = '';
+        app.style.backgroundColor = currentBg.bgColor || 'white';
+      }
+      if(img.src.startsWith('blob:')) {
+        URL.revokeObjectURL(img.src);
+      }
+    });
+
+  })();
+</script>
+</body>
+</html>
+
