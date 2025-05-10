@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<title>Tomato & Pie Splat with Sound & Background Upload/Crop</title>
+<title>Tomato & Pie Splat with Blurry Window Control Panel</title>
 <style>
   /* Reset and base */
   * {
@@ -33,33 +33,61 @@
     background-color: white;
   }
 
-  /* Control container */
+  /* Control panel as a "window" */
   #control {
     position: absolute;
     top: 12px;
     left: 12px;
     z-index: 1000;
-    background: rgba(255 255 255 / 0.85);
-    padding: 12px 16px;
+    background: rgba(255 255 255 / 0.4);
+    padding: 12px 44px 12px 16px; /* extra right padding for button */
     border-radius: 12px;
-    box-shadow: 0 0 12px rgba(0,0,0,0.25);
+    box-shadow: 0 0 20px rgba(0,0,0,0.15);
     user-select: none;
     display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
+    flex-wrap: nowrap;
     align-items: center;
     max-width: 320px;
-    transition: opacity 0.3s ease, visibility 0.3s ease;
+    transition:
+      width 0.4s ease,
+      height 0.4s ease,
+      background-color 0.4s ease,
+      padding 0.4s ease;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    overflow: hidden;
+    white-space: nowrap;
   }
-  #control.hidden {
+
+  /* Minimized state - narrow long line */
+  #control.minimized {
+    width: 60px !important;
+    height: 44px !important;
+    border-radius: 22px !important; /* half height for pill shape */
+    padding: 0 12px !important;
+    background: rgba(255 255 255 / 0.3) !important;
+  }
+
+  /* Controls inside panel */
+  #control > *:not(#minimizeBtn) {
+    transition: opacity 0.3s ease;
+    margin-right: 12px;
+    user-select: none;
+  }
+  /* Hide controls in minimized state */
+  #control.minimized > *:not(#minimizeBtn) {
     opacity: 0;
-    visibility: hidden;
     pointer-events: none;
+    margin-right: 0;
+    width: 0;
+    overflow: hidden;
   }
+
   #control label {
     font-weight: 600;
     font-size: 14px;
     color: #222;
+    flex-shrink: 0;
   }
   #bgSelect {
     font-size: 14px;
@@ -69,6 +97,7 @@
     cursor: pointer;
     transition: border-color 0.2s ease;
     background: white;
+    flex-shrink: 0;
   }
   #bgSelect:focus {
     border-color: #e63946;
@@ -76,7 +105,7 @@
   }
   #uploadLabel {
     font-size: 14px;
-    background: #e63946;
+    background: #b32e2e;
     color: white;
     border-radius: 8px;
     padding: 6px 14px;
@@ -84,40 +113,50 @@
     user-select: none;
     transition: background-color 0.3s ease;
     border: none;
+    flex-shrink: 0;
   }
   #uploadLabel:hover, #uploadLabel:focus {
-    background-color: #d62828;
+    background-color: #8b2525;
     outline: none;
   }
   #fileInput {
     display: none;
   }
 
-  /* Toggle control button */
-  #toggleControlBtn {
+  /* Minimize button */
+  #minimizeBtn {
     position: absolute;
     top: 12px;
-    left: 12px;
+    right: 12px;
+    width: 24px;
+    height: 24px;
     background: #e63946;
-    color: white;
+    border-radius: 50%;
     border: none;
-    border-radius: 8px;
-    padding: 6px 12px;
     cursor: pointer;
-    font-weight: 600;
-    font-size: 14px;
     box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
     transition: background-color 0.3s ease;
-    z-index: 1100;
+    color: white;
+    font-weight: 900;
+    font-size: 18px;
+    line-height: 1;
   }
-  #toggleControlBtn:hover, #toggleControlBtn:focus {
+  #minimizeBtn:hover, #minimizeBtn:focus {
     background-color: #d62828;
     outline: none;
   }
-  /* Hide toggle button when control is visible */
-  #toggleControlBtn.hidden {
-    display: none;
+  /* Icon for - (minimize) and + (maximize) */
+  #minimizeBtn[data-minimized="false"]::before {
+    content: "–"; /* en dash for minimize */
+    display: block;
+  }
+  #minimizeBtn[data-minimized="true"]::before {
+    content: "+"; /* plus for maximize */
+    display: block;
   }
 
   /* Click count display */
@@ -170,8 +209,7 @@
       max-width: 90vw;
       left: 5vw;
       top: 8px;
-      padding: 8px 10px;
-      font-size: 13px;
+      padding: 12px 40px 12px 16px;
     }
     #uploadLabel {
       font-size: 13px;
@@ -183,11 +221,12 @@
       bottom: 8px;
       left: 8px;
     }
-    #toggleControlBtn {
+    #minimizeBtn {
       top: 8px;
-      left: 8px;
-      font-size: 13px;
-      padding: 5px 10px;
+      right: 8px;
+      width: 22px;
+      height: 22px;
+      font-size: 16px;
     }
   }
 
@@ -254,21 +293,21 @@
 </head>
 <body>
   <div id="app" tabindex="0" aria-label="Tomato and Pie throwing game. Click anywhere to splat. Change background with presets or upload on top left.">
-    <button id="toggleControlBtn" aria-pressed="true" aria-label="Toggle background controls">Hide Controls</button>
-    <div id="control" role="region" aria-label="Background selection and upload control">
-      <label for="bgSelect">Background:</label>
+    <div id="control" role="region" aria-label="Background selection and upload control" aria-expanded="true">
+      <label for="bgSelect">BG:</label>
       <select id="bgSelect" aria-controls="app">
-        <option value="white">White</option>
-        <option value="#d0f0fd">Sky Blue</option>
-        <option value="#fce6e6">Soft Pink</option>
-        <option value="#d6f5d6">Light Green</option>
-        <option value="#fff4cc">Light Yellow</option>
-        <option value="url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&amp;fit=crop&amp;w=350&amp;q=80')">Beach</option>
-        <option value="url('https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&amp;fit=crop&amp;w=350&amp;q=80')">Meadow</option>
-        <option value="url('https://images.unsplash.com/photo-1425321395722-b1dd54a97cf3?auto=format&amp;fit=crop&amp;w=350&amp;q=80')">Wood</option>
+        <option value="url('https://media.tenor.com/SMK_Zlqd9DgAAAAM/mio-mio-chan.gif')">mio</option>
+        <option value="url('https://i.makeagif.com/media/4-05-2024/H37fEr.gif')">til</option>
+        <option value="url('https://media.tenor.com/GKHnTrDdWmkAAAAM/luckystar-animegirl.gif')">konata</option>
+        <option value="url('https://media.tenor.com/IX3NKl_L7KkAAAAM/rei-ayanami.gif')">rei</option>
+        <option value="url('https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSqmW2zzFGYLt7mcbZPp_XP5h0hPJq-etRIXA&s')">chiyo</option>
+        <option value="url('https://i.pinimg.com/474x/6e/cb/1c/6ecb1cea281b126cfe369dc2745c7c29.jpg')">italian</option>
+        <option value="url('https://media.tenor.com/OHWiYziKkU8AAAAe/adachi-persona.png')">adachi</option>
+        <option value="url('https://media.tenor.com/aBMXNytuisYAAAAe/larry-butz.png')">larry</option>
       </select>
       <label id="uploadLabel" for="fileInput" tabindex="0" role="button" aria-label="Upload background image">Upload Image</label>
       <input type="file" accept="image/*" id="fileInput" aria-hidden="true" />
+      <button id="minimizeBtn" aria-label="Minimize control panel" data-minimized="false" aria-expanded="true" role="button" tabindex="0"></button>
     </div>
     <div id="clickCount" aria-live="polite" aria-atomic="true">Clicks: 0</div>
   </div>
@@ -292,12 +331,12 @@
 <script>
   (function(){
     const app = document.getElementById('app');
+    const controlPanel = document.getElementById('control');
+    const minimizeBtn = document.getElementById('minimizeBtn');
     const bgSelect = document.getElementById('bgSelect');
     const splatSound = document.getElementById('splatSound');
     const fileInput = document.getElementById('fileInput');
     const uploadLabel = document.getElementById('uploadLabel');
-    const controlPanel = document.getElementById('control');
-    const toggleControlBtn = document.getElementById('toggleControlBtn');
     const clickCountDisplay = document.getElementById('clickCount');
 
     // Splat images
@@ -397,23 +436,12 @@
     app.addEventListener('click', onThrow);
     app.addEventListener('touchstart', onThrow);
 
-    // Toggle control panel visibility
-    toggleControlBtn.addEventListener('click', () => {
-      if(controlPanel.classList.contains('hidden')){
-        controlPanel.classList.remove('hidden');
-        toggleControlBtn.textContent = 'Hide Controls';
-        toggleControlBtn.setAttribute('aria-pressed', 'true');
-        // Move toggle button above control panel
-        toggleControlBtn.style.left = '12px';
-        toggleControlBtn.style.top = '12px';
-      } else {
-        controlPanel.classList.add('hidden');
-        toggleControlBtn.textContent = 'Show Controls';
-        toggleControlBtn.setAttribute('aria-pressed', 'false');
-        // Move toggle button to top left corner for easy access when controls hidden
-        toggleControlBtn.style.left = '12px';
-        toggleControlBtn.style.top = '12px';
-      }
+    // Toggle minimize / maximize
+    minimizeBtn.addEventListener('click', () => {
+      const minimized = controlPanel.classList.toggle('minimized');
+      minimizeBtn.dataset.minimized = minimized ? "true" : "false";
+      minimizeBtn.setAttribute('aria-expanded', minimized ? "false" : "true");
+      controlPanel.setAttribute('aria-expanded', minimized ? "false" : "true");
     });
 
     // Open file selector on label click or keyboard enter/space key
@@ -434,9 +462,12 @@
       e.target.value = '';
     });
 
-    // When image loaded, open crop modal and initialize
     img.onload = () => {
       openCropModal();
+    };
+
+    img.onerror = () => {
+      alert('Failed to load image. Please try a different file.');
     };
 
     function openCropModal(){
@@ -606,4 +637,3 @@
 </script>
 </body>
 </html>
-
